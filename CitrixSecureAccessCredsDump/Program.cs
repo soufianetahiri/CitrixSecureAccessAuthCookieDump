@@ -136,10 +136,12 @@ namespace CitrixSecureAccessCredsDump
                 if (rg.Match(s).Success)
                 {
                     Console.WriteLine($"[+] Auth Cookie found : NSC_AAAC={s}");
+                    break;
                 }
                 if (start == -1)
                 {
                     Console.WriteLine($"[-] Nothing found.");
+                    break;
                 }
             }
         }
