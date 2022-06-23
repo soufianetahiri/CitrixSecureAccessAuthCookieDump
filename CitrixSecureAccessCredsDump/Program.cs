@@ -132,7 +132,6 @@ namespace CitrixSecureAccessCredsDump
             {
                 var newArr = fileContent.Skip(start + 9).Take(65).ToArray();
                 string s = Encoding.UTF8.GetString(newArr, 0, newArr.Length);
-
                 start = Search(fileContent, bytes, start + 9);
                 if (rg.Match(s).Success)
                 {
