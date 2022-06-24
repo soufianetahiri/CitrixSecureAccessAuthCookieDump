@@ -1,2 +1,1 @@
-# CitrixSecureAccessCredsDump
 read the code :)
